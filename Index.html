@@ -1,0 +1,148 @@
+<script>
+    // Dark mode detection (kept from your code)
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.add('dark');
+    }
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+        if (event.matches) {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+    });
+
+    // DOM elements
+    const form = document.getElementById('recipeForm');
+    const generateBtn = document.getElementById('generateBtn');
+    const btnText = document.getElementById('btnText');
+    const btnLoading = document.getElementById('btnLoading');
+    const loadingSection = document.getElementById('loadingSection');
+    const resultsSection = document.getElementById('resultsSection');
+    const errorSection = document.getElementById('errorSection');
+    const recipeContent = document.getElementById('recipeContent');
+    const newRecipeBtn = document.getElementById('newRecipeBtn');
+    const retryBtn = document.getElementById('retryBtn');
+
+    // State
+    let isGenerating = false;
+
+    // Form submission
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        await generateRecipe();
+    });
+
+    newRecipeBtn.addEventListener('click', () => {
+        hideAllSections();
+        form.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    retryBtn.addEventListener('click', () => {
+        generateRecipe();
+    });
+
+    async function generateRecipe() {
+        if (isGenerating) return;
+
+        // Collect form data
+        const healthConditions = document.getElementById('healthConditions').value.trim();
+        const allergies = document.getElementById('allergies').value.trim();
+        const goals = document.getElementById('goals').value.trim();
+        const tastes = document.getElementById('tastes').value.trim();
+        const mealType = document.getElementById('mealType').value;
+
+        if (!healthConditions && !allergies && !goals && !tastes) {
+            showError("Please fill in at least one field to get personalized recommendations.");
+            return;
+        }
+
+        setLoadingState(true);
+        showLoadingSection();
+
+        const prompt = `As a team of expert doctors, nutritionists, and chefs, create a personalized ${mealType !== 'any' ? mealType : 'meal'} recipe based on the following profile:
+
+Health Conditions: ${healthConditions || 'None'}
+Allergies & Restrictions: ${allergies || 'None'}
+Health Goals: ${goals || 'General wellness'}
+Taste Preferences: ${tastes || 'Any'}
+
+Please provide:
+1. Medical Analysis
+2. Nutritional Breakdown
+3. Recipe Name
+4. Ingredients
+5. Instructions
+6. Chef's Tips
+7. Nutritional Info
+8. Health Benefits
+
+Format in clear markdown.`;
+
+        try {
+            const response = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer YOUR_OPENAI_API_KEY_HERE`
+                },
+                body: JSON.stringify({
+                    model: "gpt-4o-mini", 
+                    messages: [{ role: "user", content: prompt }]
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                throw new Error(data.error.message);
+            }
+
+            showResults(data.choices[0].message.content);
+
+        } catch (error) {
+            showError("Failed to generate recipe: " + error.message);
+        }
+    }
+
+    function showLoadingSection() {
+        hideAllSections();
+        loadingSection.classList.remove('hidden');
+    }
+
+    function showResults(content) {
+        setLoadingState(false);
+        hideAllSections();
+        recipeContent.innerHTML = marked.parse(content);
+        resultsSection.classList.remove('hidden');
+        resultsSection.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function showError(message) {
+        setLoadingState(false);
+        hideAllSections();
+        document.getElementById('errorMessage').textContent = message;
+        errorSection.classList.remove('hidden');
+        errorSection.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function hideAllSections() {
+        loadingSection.classList.add('hidden');
+        resultsSection.classList.add('hidden');
+        errorSection.classList.add('hidden');
+    }
+
+    function setLoadingState(loading) {
+        isGenerating = loading;
+        generateBtn.disabled = loading;
+
+        if (loading) {
+            btnText.classList.add('hidden');
+            btnLoading.classList.remove('hidden');
+            generateBtn.classList.add('opacity-75', 'cursor-not-allowed');
+        } else {
+            btnText.classList.remove('hidden');
+            btnLoading.classList.add('hidden');
+            generateBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+        }
+    }
+</script>
